@@ -14,7 +14,7 @@ TaskHandle_t mqtt_task_handle;
 WiFiClient wifi_client;
 PubSubClient mqtt_client(wifi_client);
 
-volatile bool door_open = false;
+volatile uint8_t door_state = -1; // 0 = open, 1 = closed, -1 = unknown, -2 = invalid state
 
 char host_ip[16];
 char device_name[50];
@@ -22,12 +22,33 @@ char user[50];
 char password[50];
 uint16_t port;
 
+StaticJsonDocument<2048> payload_buffer;
+
 void subscribe() {
-    // TODO: subscribe to topics that report door state
+    mqtt_client.subscribe("home/stat/garage_door_state");
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
-    // TODO: this is where the variables of door state are set, then in homespan code, these variable are polled to check door status
+    payload_buffer.clear();
+    DeserializationError error = deserializeJson(payload_buffer, payload, length);
+    if (error) {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(error.c_str());
+    }
+
+    if (strcmp(topic, "home/stat/garage_door_state") == 0) {
+        if (payload_buffer.containsKey("door_state")) {
+            if (strcmp(payload_buffer["door_state"], "open") == 0) {
+                door_state = 0;
+            } else if (strcmp(payload_buffer["door_state"], "closed") == 0) {
+                door_state = 1;
+            } else if (strcmp(payload_buffer["door_state"], "unknown") == 0) {
+                door_state = -1;
+            } else {
+                door_state = -2;
+            }
+        }
+    }
 }
 
 void reconnect() {
@@ -54,25 +75,6 @@ void reconnect() {
 
 }
 
-//char* ask_for_user_input(const char* question) {
-//    Serial.println(question);
-//    while (!Serial.available()) {
-//
-//    }
-//
-//    String answer;
-//
-//    if (Serial.available()) {
-//        answer = Serial.readStringUntil('\n');
-//    }
-//
-//    char* retVal = static_cast<char *>(malloc((answer.length() + 1) * sizeof(char)));
-//    strcpy(retVal, answer.c_str());
-//
-//    return retVal;
-//
-//}
-//
 
 void setupMqtt() {
 
@@ -80,38 +82,6 @@ void setupMqtt() {
         vTaskDelay(500 / portTICK_PERIOD_MS);
     }
 
-//    nvs_open("SAVED_DATA",NVS_READWRITE,&mqtt_config_nvs_handle);
-//
-//    size_t required_size;
-
-//    if (!nvs_get_str(mqtt_config_nvs_handle, "host_ip", NULL, &required_size)) { // found key
-//        host_ip = static_cast<char *>(malloc(required_size));
-//        nvs_get_str(mqtt_config_nvs_handle, "host_ip", host_ip, &required_size);
-//    } else {
-//        host_ip = ask_for_user_input("what is the host ip");
-//        nvs_set_str(mqtt_config_nvs_handle, "host_ip", host_ip);
-//    }
-
-//    if (nvs_get_u16(mqtt_config_nvs_handle, "port", &port) == ESP_ERR_NVS_NOT_FOUND) {
-//        port = atoi(ask_for_user_input("what port"));
-//        nvs_set_u16(mqtt_config_nvs_handle, "port", port);
-//    }
-
-//    if (!nvs_get_str(mqtt_config_nvs_handle, "user", NULL, &required_size)) { // found key
-//        user = static_cast<char *>(malloc(required_size));
-//        nvs_get_str(mqtt_config_nvs_handle, "user", user, &required_size);
-//    } else {
-//        user = ask_for_user_input("what is the mqtt username");
-//        nvs_set_str(mqtt_config_nvs_handle, "user", user);
-//    }
-//
-//    if (!nvs_get_str(mqtt_config_nvs_handle, "password", NULL, &required_size)) { // found key
-//        password = static_cast<char *>(malloc(required_size));
-//        nvs_get_str(mqtt_config_nvs_handle, "password", password, &required_size);
-//    } else {
-//        password = ask_for_user_input("what is the password for that user");
-//        nvs_set_str(mqtt_config_nvs_handle, "password", password);
-//    }
 
     StaticJsonDocument<2048> config;
 
@@ -154,10 +124,6 @@ void setupMqtt() {
     }
 
     Serial.print("Setup MQTT Failed");
-
-
-//    nvs_close(mqtt_config_nvs_handle);
-
 
 }
 
