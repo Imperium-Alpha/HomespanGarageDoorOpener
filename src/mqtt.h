@@ -22,31 +22,30 @@ char user[50];
 char password[50];
 uint16_t port;
 
-StaticJsonDocument<2048> payload_buffer;
 
 void subscribe() {
     mqtt_client.subscribe("home/stat/garage_door_state");
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
-    payload_buffer.clear();
-    DeserializationError error = deserializeJson(payload_buffer, payload, length);
-    if (error) {
-        Serial.print(F("deserializeJson() failed: "));
-        Serial.println(error.c_str());
-    }
 
     if (strcmp(topic, "home/stat/garage_door_state") == 0) {
-        if (payload_buffer.containsKey("door_state")) {
-            if (strcmp(payload_buffer["door_state"], "open") == 0) {
-                door_state = 0;
-            } else if (strcmp(payload_buffer["door_state"], "closed") == 0) {
-                door_state = 1;
-            } else if (strcmp(payload_buffer["door_state"], "unknown") == 0) {
-                door_state = -1;
-            } else {
-                door_state = -2;
-            }
+        Serial.println("Getting MQTT Garage Door State Message");
+        Serial.println(length);
+        payload[length] = '\0';
+        Serial.println((char*) payload);
+        if (strcmp((char*) payload, "open") == 0) {
+            Serial.println("Door state to open");
+            door_state = 0;
+        } else if (strcmp((char*) payload, "closed") == 0) {
+            Serial.println("Door state to closed");
+            door_state = 1;
+        } else if (strcmp((char*) payload, "unknown") == 0) {
+            Serial.println("Door state to unknown");
+            door_state = -1;
+        } else {
+            Serial.println("Door state to wtf");
+            door_state = -2;
         }
     }
 }
@@ -65,18 +64,21 @@ void reconnect() {
 
 [[noreturn]] void mqtt_task(void*) {
     while (true) {
-        mqtt_client.loop();
+
         if (WiFi.status() == WL_CONNECTED && !mqtt_client.connected()) {
             reconnect();
         } else if (WiFi.status() != WL_CONNECTED) {
             ESP.restart();
         }
+        mqtt_client.loop();
     }
 
 }
 
 
 void setupMqtt() {
+
+    SPIFFS.begin();
 
     while (WiFi.status() != WL_CONNECTED) { // wait for wifi to connect first
         vTaskDelay(500 / portTICK_PERIOD_MS);
@@ -117,11 +119,14 @@ void setupMqtt() {
                         &mqtt_task_handle,
                         app_cpu
                 );
+                SPIFFS.end();
 
                 return;
             }
         }
     }
+
+    SPIFFS.end();
 
     Serial.print("Setup MQTT Failed");
 

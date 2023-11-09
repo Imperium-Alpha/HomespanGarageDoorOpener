@@ -10,7 +10,7 @@ SpanUserCommand* erase_mqtt_config_cmd_handle;
 
 void setup() {
     Serial.begin(115200);
-    SPIFFS.begin();
+
     initialize_relay();
 
     homeSpan.setLogLevel(2);

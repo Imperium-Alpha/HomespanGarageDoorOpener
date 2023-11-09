@@ -6,7 +6,8 @@
 #include <HomeSpan.h>
 #include "relay.h"
 #include "mqtt.h"
-#define CHECK_INTERVAL 8000  // this must be greater than the time taken for door to completely open or close
+#define CHECK_INTERVAL 16000  // this must be greater than the time taken for door to completely open or close
+#define RELAY_CLOSE_DURATION 1000
 
 struct AccessoryInformation: Service::AccessoryInformation {
     SpanCharacteristic* name;
@@ -34,17 +35,17 @@ struct GarageDoorOpener: Service::GarageDoorOpener {
 
     boolean update() override {
         if (target->getNewVal() == 0 && current->getVal() == 1) {
-            switch_on_relay(200);
+            switch_on_relay(RELAY_CLOSE_DURATION);
             current->setVal(2);
             Serial.println("Home app is opening the garage door");
 
         } else if (target->getNewVal() == 1 && current->getVal() == 0) {
-            switch_on_relay(200);
+            switch_on_relay(RELAY_CLOSE_DURATION);
             current->setVal(3);
             Serial.println("Home app is closing the garage door");
         } else if (current->getVal() == 2 || current->getVal() == 3) {
             // e-stop during door closing or opening
-            switch_on_relay(200);
+            switch_on_relay(RELAY_CLOSE_DURATION);
             if (current->getVal() == 2 && target->getNewVal() == 1) {
                 // e stop is trigger when door is opening, (target state changed from open 0 to closed 1)
                 target->setVal(0); // set target to open, so user can now close to door.
@@ -53,10 +54,10 @@ struct GarageDoorOpener: Service::GarageDoorOpener {
             }
             current->setVal(4); // door is stopped
         } else if (current->getVal() == 4 && target->getNewVal() == 0) {
-            switch_on_relay(200);
+            switch_on_relay(RELAY_CLOSE_DURATION);
             current->setVal(2);
         } else if (current->getVal() == 4 && target->getNewVal() == 1) {
-            switch_on_relay(200);
+            switch_on_relay(RELAY_CLOSE_DURATION);
             current->setVal(3);
         }
 
